@@ -27,19 +27,35 @@ public struct OpenClawRemindersAddParams: Codable, Sendable, Equatable {
     public var notes: String?
     public var listId: String?
     public var listName: String?
+    /// Recurrence frequency: "daily", "weekly", "monthly", "yearly"
+    public var recurrence: String?
+    /// Number of frequency units between occurrences (default 1)
+    public var recurrenceInterval: Int?
+    /// ISO-8601 date when recurrence should stop
+    public var recurrenceEndISO: String?
+    /// Priority: 0 = none, 1 = high, 5 = medium, 9 = low
+    public var priority: Int?
 
     public init(
         title: String,
         dueISO: String? = nil,
         notes: String? = nil,
         listId: String? = nil,
-        listName: String? = nil)
+        listName: String? = nil,
+        recurrence: String? = nil,
+        recurrenceInterval: Int? = nil,
+        recurrenceEndISO: String? = nil,
+        priority: Int? = nil)
     {
         self.title = title
         self.dueISO = dueISO
         self.notes = notes
         self.listId = listId
         self.listName = listName
+        self.recurrence = recurrence
+        self.recurrenceInterval = recurrenceInterval
+        self.recurrenceEndISO = recurrenceEndISO
+        self.priority = priority
     }
 }
 
@@ -49,19 +65,28 @@ public struct OpenClawReminderPayload: Codable, Sendable, Equatable {
     public var dueISO: String?
     public var completed: Bool
     public var listName: String?
+    public var recurrence: String?
+    public var recurrenceInterval: Int?
+    public var priority: Int?
 
     public init(
         identifier: String,
         title: String,
         dueISO: String? = nil,
         completed: Bool,
-        listName: String? = nil)
+        listName: String? = nil,
+        recurrence: String? = nil,
+        recurrenceInterval: Int? = nil,
+        priority: Int? = nil)
     {
         self.identifier = identifier
         self.title = title
         self.dueISO = dueISO
         self.completed = completed
         self.listName = listName
+        self.recurrence = recurrence
+        self.recurrenceInterval = recurrenceInterval
+        self.priority = priority
     }
 }
 
