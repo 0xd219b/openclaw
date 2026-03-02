@@ -33,7 +33,7 @@ public struct OpenClawRemindersAddParams: Codable, Sendable, Equatable {
     public var recurrenceInterval: Int?
     /// ISO-8601 date when recurrence should stop
     public var recurrenceEndISO: String?
-    /// Priority: 0 = none, 1 = high, 5 = medium, 9 = low
+    /// Priority: 0 = none, 1 = high, 5 = medium, 9 = low (values outside 0-9 are rejected)
     public var priority: Int?
 
     public init(

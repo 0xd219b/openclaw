@@ -80,7 +80,12 @@ final class RemindersService: RemindersServicing {
         }
 
         if let priority = params.priority {
-            reminder.priority = max(0, min(priority, 9))
+            guard priority >= 0, priority <= 9 else {
+                throw NSError(domain: "Reminders", code: 9, userInfo: [
+                    NSLocalizedDescriptionKey: "REMINDERS_INVALID: priority must be 0-9",
+                ])
+            }
+            reminder.priority = priority
         }
 
         if let recurrence = params.recurrence?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
