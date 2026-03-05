@@ -489,4 +489,160 @@ private final class MockWatchMessagingService: @preconcurrency WatchMessagingSer
         await appModel._test_handleCanvasA2UIAction(body: body)
         #expect(appModel.screen.urlString.isEmpty)
     }
+
+    // MARK: - Reminders invoke tests
+
+    @Test @MainActor func handleInvokeRemindersListRoutesToService() async throws {
+        let remindersService = MockRemindersService()
+        remindersService.nextListPayload = OpenClawRemindersListPayload(reminders: [
+            OpenClawReminderPayload(
+                identifier: "R1",
+                title: "Buy milk",
+                dueISO: "2026-03-03T09:00:00Z",
+                completed: false,
+                listName: "Groceries",
+                recurrence: "weekly",
+                recurrenceInterval: 1,
+                priority: 5),
+        ])
+        let appModel = NodeAppModel(remindersService: remindersService)
+
+        let params = OpenClawRemindersListParams(status: .incomplete, limit: 10)
+        let paramsData = try JSONEncoder().encode(params)
+        let paramsJSON = String(decoding: paramsData, as: UTF8.self)
+        let req = BridgeInvokeRequest(
+            id: "rem-list",
+            command: OpenClawRemindersCommand.list.rawValue,
+            paramsJSON: paramsJSON)
+
+        let res = await appModel._test_handleInvoke(req)
+        #expect(res.ok == true)
+
+        let payloadData = try #require(res.payloadJSON?.data(using: .utf8))
+        let payload = try JSONDecoder().decode(OpenClawRemindersListPayload.self, from: payloadData)
+        #expect(payload.reminders.count == 1)
+        #expect(payload.reminders[0].title == "Buy milk")
+        #expect(payload.reminders[0].recurrence == "weekly")
+        #expect(payload.reminders[0].recurrenceInterval == 1)
+        #expect(payload.reminders[0].priority == 5)
+        #expect(remindersService.lastListParams?.status == .incomplete)
+        #expect(remindersService.lastListParams?.limit == 10)
+    }
+
+    @Test @MainActor func handleInvokeRemindersAddRoutesToService() async throws {
+        let remindersService = MockRemindersService()
+        remindersService.nextAddPayload = OpenClawRemindersAddPayload(
+            reminder: OpenClawReminderPayload(
+                identifier: "R-new",
+                title: "Daily standup",
+                dueISO: "2026-03-03T09:00:00Z",
+                completed: false,
+                listName: "Work",
+                recurrence: "daily",
+                recurrenceInterval: 1,
+                priority: 1))
+        let appModel = NodeAppModel(remindersService: remindersService)
+
+        let params = OpenClawRemindersAddParams(
+            title: "Daily standup",
+            dueISO: "2026-03-03T09:00:00Z",
+            recurrence: "daily",
+            recurrenceInterval: 1,
+            priority: 1)
+        let paramsData = try JSONEncoder().encode(params)
+        let paramsJSON = String(decoding: paramsData, as: UTF8.self)
+        let req = BridgeInvokeRequest(
+            id: "rem-add",
+            command: OpenClawRemindersCommand.add.rawValue,
+            paramsJSON: paramsJSON)
+
+        let res = await appModel._test_handleInvoke(req)
+        #expect(res.ok == true)
+
+        let payloadData = try #require(res.payloadJSON?.data(using: .utf8))
+        let payload = try JSONDecoder().decode(OpenClawRemindersAddPayload.self, from: payloadData)
+        #expect(payload.reminder.title == "Daily standup")
+        #expect(payload.reminder.recurrence == "daily")
+        #expect(payload.reminder.recurrenceInterval == 1)
+        #expect(payload.reminder.priority == 1)
+        #expect(remindersService.lastAddParams?.title == "Daily standup")
+        #expect(remindersService.lastAddParams?.recurrence == "daily")
+        #expect(remindersService.lastAddParams?.recurrenceInterval == 1)
+        #expect(remindersService.lastAddParams?.priority == 1)
+    }
+
+    @Test @MainActor func handleInvokeRemindersAddReturnsErrorOnServiceFailure() async throws {
+        let remindersService = MockRemindersService()
+        remindersService.addError = NSError(domain: "Reminders", code: 7, userInfo: [
+            NSLocalizedDescriptionKey: "REMINDERS_INVALID: recurrence must be daily, weekly, monthly, or yearly",
+        ])
+        let appModel = NodeAppModel(remindersService: remindersService)
+
+        let params = OpenClawRemindersAddParams(title: "Bad recurrence", recurrence: "biweekly")
+        let paramsData = try JSONEncoder().encode(params)
+        let paramsJSON = String(decoding: paramsData, as: UTF8.self)
+        let req = BridgeInvokeRequest(
+            id: "rem-add-err",
+            command: OpenClawRemindersCommand.add.rawValue,
+            paramsJSON: paramsJSON)
+
+        let res = await appModel._test_handleInvoke(req)
+        #expect(res.ok == false)
+    }
+
+    @Test @MainActor func handleInvokeRemindersAddWithRecurrenceEndISO() async throws {
+        let remindersService = MockRemindersService()
+        remindersService.nextAddPayload = OpenClawRemindersAddPayload(
+            reminder: OpenClawReminderPayload(
+                identifier: "R-recur",
+                title: "Weekly review",
+                dueISO: "2026-03-03T10:00:00Z",
+                completed: false,
+                recurrence: "weekly",
+                recurrenceInterval: 2))
+        let appModel = NodeAppModel(remindersService: remindersService)
+
+        let params = OpenClawRemindersAddParams(
+            title: "Weekly review",
+            dueISO: "2026-03-03T10:00:00Z",
+            recurrence: "weekly",
+            recurrenceInterval: 2,
+            recurrenceEndISO: "2026-12-31T23:59:59Z")
+        let paramsData = try JSONEncoder().encode(params)
+        let paramsJSON = String(decoding: paramsData, as: UTF8.self)
+        let req = BridgeInvokeRequest(
+            id: "rem-add-end",
+            command: OpenClawRemindersCommand.add.rawValue,
+            paramsJSON: paramsJSON)
+
+        let res = await appModel._test_handleInvoke(req)
+        #expect(res.ok == true)
+        #expect(remindersService.lastAddParams?.recurrenceEndISO == "2026-12-31T23:59:59Z")
+        #expect(remindersService.lastAddParams?.recurrenceInterval == 2)
+    }
+}
+
+// MARK: - Mock RemindersServicing
+
+@MainActor
+private final class MockRemindersService: @preconcurrency RemindersServicing, @unchecked Sendable {
+    var nextListPayload = OpenClawRemindersListPayload(reminders: [])
+    var nextAddPayload = OpenClawRemindersAddPayload(
+        reminder: OpenClawReminderPayload(identifier: "mock", title: "mock", completed: false))
+    var addError: Error?
+    var lastListParams: OpenClawRemindersListParams?
+    var lastAddParams: OpenClawRemindersAddParams?
+
+    func list(params: OpenClawRemindersListParams) async throws -> OpenClawRemindersListPayload {
+        self.lastListParams = params
+        return self.nextListPayload
+    }
+
+    func add(params: OpenClawRemindersAddParams) async throws -> OpenClawRemindersAddPayload {
+        self.lastAddParams = params
+        if let addError {
+            throw addError
+        }
+        return self.nextAddPayload
+    }
 }
